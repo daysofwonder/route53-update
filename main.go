@@ -104,36 +104,16 @@ func main() {
 								Value: aws.String(target), // Required
 							},
 						},
-						TTL:           aws.Int64(ttl),
-						Weight:        aws.Int64(int64(1)),
-						SetIdentifier: aws.String("Arbitrary Id describing this change set"),
+						TTL: aws.Int64(ttl),
 					},
 				},
 			},
-			Comment: aws.String("Sample update."),
+			Comment: aws.String("route53-update"),
 		},
 		HostedZoneId: aws.String(zoneID), // Required
 	}
 	resp, err := svc.ChangeResourceRecordSets(params)
-
-	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			// Get error details
-			log.Println("Error:", awsErr.Code(), awsErr.Message())
-
-			// Prints out full error message, including original error if there was one.
-			log.Println("Error:", awsErr.Error())
-
-			// Get original error
-			if origErr := awsErr.OrigErr(); origErr != nil {
-				// operate on original error.
-				fmt.Println(origErr.Error())
-			}
-		} else {
-			fmt.Println(err.Error())
-		}
-		return
-	}
+	abortOnError(err)
 
 	if waitForIt {
 		log.Printf("waiting changes to propagate: %s\n", *resp.ChangeInfo.Comment)
@@ -142,26 +122,20 @@ func main() {
 			Id: resp.ChangeInfo.Id,
 		}
 		err = svc.WaitUntilResourceRecordSetsChanged(changeInput)
-		if err != nil {
-			if awsErr, ok := err.(awserr.Error); ok {
-				// Get error details
-				log.Println("Error:", awsErr.Code(), awsErr.Message())
-
-				// Prints out full error message, including original error if there was one.
-				log.Println("Error:", awsErr.Error())
-
-				// Get original error
-				if origErr := awsErr.OrigErr(); origErr != nil {
-					// operate on original error.
-					fmt.Println(origErr.Error())
-				}
-			} else {
-				fmt.Println(err.Error())
-			}
-			return
-		}
+		abortOnError(err)
 		log.Println("change applied")
 	} else {
 		log.Println("change sent to route53")
+	}
+}
+
+func abortOnError(err error) {
+	if err != nil {
+		if awsErr, ok := err.(awserr.Error); ok {
+			log.Println("Error:", awsErr.Error())
+		} else {
+			log.Println(err.Error())
+		}
+		os.Exit(1)
 	}
 }
